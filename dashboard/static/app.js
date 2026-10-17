@@ -46,6 +46,9 @@ const btnDownloadCode = document.getElementById("btnDownloadCode");
 const projectHistoryList = document.getElementById("projectHistoryList");
 const btnNewProject = document.getElementById("btnNewProject");
 const btnLaunchViewer = document.getElementById("btnLaunchViewer");
+const aiModelSelect = document.getElementById("aiModelSelect");
+const dynamicPresetList = document.getElementById("dynamicPresetList");
+const btnRefreshInspirations = document.getElementById("btnRefreshInspirations");
 
 // =============================================================================
 // THREE.JS VIEWPORT INITIALIZATION
@@ -225,7 +228,10 @@ async function handlePolishPrompt() {
     const res = await fetch("/api/polish-prompt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: prompt }),
+      body: JSON.stringify({
+        prompt: prompt,
+        model: aiModelSelect ? aiModelSelect.value : null,
+      }),
     });
     const data = await res.json();
 
@@ -273,6 +279,7 @@ async function handleGenerateCad() {
         polished_spec: spec || "Generated from source code",
         code: code,
         parameters: currentParameters,
+        model: aiModelSelect ? aiModelSelect.value : null,
       }),
     });
     const data = await res.json();
@@ -331,6 +338,7 @@ async function handleApplyEdit() {
         edit_instruction: instruction,
         current_code: cadCodeInput.value || currentCode,
         current_spec: polishedSpecText.value || currentSpec,
+        model: aiModelSelect ? aiModelSelect.value : null,
       }),
     });
     const data = await res.json();
@@ -501,13 +509,60 @@ btnToggleCodeView.addEventListener("click", () => {
   btnToggleCodeView.textContent = isHidden ? "Hide Python Code" : "Show Python Code";
 });
 
-// Preset Pills
-document.querySelectorAll(".preset-pill").forEach((pill) => {
-  pill.addEventListener("click", () => {
-    promptInput.value = pill.getAttribute("data-prompt");
-    handlePolishPrompt();
+// Dynamic AI Models & Inspiration Loader
+async function loadDynamicModels() {
+  if (!aiModelSelect) return;
+  try {
+    const res = await fetch("/api/models");
+    const data = await res.json();
+    if (data.models && data.models.length > 0) {
+      aiModelSelect.innerHTML = "";
+      data.models.forEach((m) => {
+        const opt = document.createElement("option");
+        opt.value = m.id;
+        opt.textContent = `${m.name} (${m.provider})`;
+        if (m.id === data.active_model) opt.selected = true;
+        aiModelSelect.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.warn("Could not fetch dynamic models:", err);
+  }
+}
+
+async function loadDynamicInspirations(topic = "") {
+  if (!dynamicPresetList) return;
+  dynamicPresetList.innerHTML = `<span style="font-size:0.75rem; color:var(--text-muted); padding:4px 0;">Generating dynamic design ideas...</span>`;
+  try {
+    const res = await fetch(`/api/inspire${topic ? "?topic=" + encodeURIComponent(topic) : ""}`);
+    const data = await res.json();
+    const ideas = data.ideas || data.presets || [];
+    dynamicPresetList.innerHTML = "";
+    if (ideas.length > 0) {
+      ideas.forEach((idea) => {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "preset-pill";
+        pill.textContent = idea.title || idea.label || "Design Idea";
+        pill.title = idea.prompt;
+        pill.addEventListener("click", () => {
+          promptInput.value = idea.prompt;
+          handlePolishPrompt();
+        });
+        dynamicPresetList.appendChild(pill);
+      });
+    }
+  } catch (err) {
+    console.warn("Could not fetch inspirations:", err);
+    dynamicPresetList.innerHTML = "";
+  }
+}
+
+if (btnRefreshInspirations) {
+  btnRefreshInspirations.addEventListener("click", () => {
+    loadDynamicInspirations();
   });
-});
+}
 
 // Viewport Controls
 btnResetView.addEventListener("click", () => {
@@ -625,5 +680,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initThreeViewport();
   loadProjectHistory();
   checkEngineConfig();
+  loadDynamicModels();
+  loadDynamicInspirations();
   switchMobileTab("editor"); // Default to editor view on mobile
 });

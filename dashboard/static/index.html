@@ -73,26 +73,18 @@
       <!-- Left Sidebar: History & Quick Presets -->
       <aside class="sidebar-panel" id="sidebarPanel">
         <div class="sidebar-section">
-          <div class="section-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            QUICK STARTERS
+          <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+              AI INSPIRATIONS
+            </div>
+            <button class="btn btn-secondary btn-xs" id="btnRefreshInspirations" title="Dynamically Generate New Ideas with Groq">
+              ✨ New Ideas
+            </button>
           </div>
-          <div class="preset-list">
-            <button class="preset-pill" data-prompt="L-shaped mounting bracket with two mounting holes on base and one on wall, 60x30x25mm">
-              Mounting Bracket
-            </button>
-            <button class="preset-pill" data-prompt="Parametric electronics enclosure with internal mounting standoffs, 90x60x28mm, 2.5mm wall">
-              Electronics Enclosure
-            </button>
-            <button class="preset-pill" data-prompt="20-tooth GT2 timing pulley with 5mm shaft bore and dual side flanges">
-              Timing Pulley
-            </button>
-            <button class="preset-pill" data-prompt="Pipe flange adapter with 4-bolt circular pattern and 25mm center bore">
-              Pipe Flange
-            </button>
-            <button class="preset-pill" data-prompt="Knurled control knob with 6mm shaft bore and pointer skirt">
-              Control Knob
-            </button>
+          <div class="preset-list" id="dynamicPresetList">
+            <!-- Dynamically populated by /api/inspire -->
+            <div class="loading-hint">Loading dynamic ideas...</div>
           </div>
         </div>
 
@@ -114,6 +106,12 @@
           <div class="card-header">
             <div class="step-indicator">STEP 1</div>
             <h2>Describe What You Want to Build</h2>
+            <div class="model-select-wrapper" style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+              <span class="hud-label" style="font-size: 0.72rem;">Model:</span>
+              <select id="aiModelSelect" class="tool-select" style="font-size: 0.72rem; padding: 3px 6px;">
+                <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
+              </select>
+            </div>
           </div>
           <div class="prompt-input-wrapper">
             <textarea id="promptInput" rows="3" placeholder="e.g., Parametric mounting bracket with 2 bolt holes, 65mm long, 35mm wide, 35mm tall, 5mm thickness..."></textarea>
