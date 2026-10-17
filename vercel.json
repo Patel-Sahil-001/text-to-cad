@@ -9,6 +9,14 @@
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "https://text-to-cad.onrender.com/api/$1"
+    },
+    {
+      "src": "/outputs/(.*)",
+      "dest": "https://text-to-cad.onrender.com/outputs/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/dashboard/static/$1"
     }

@@ -4,6 +4,14 @@
  * live parameter adjustments, and conversational CAD editing.
  */
 
+// Dynamic Backend API Host
+// Automatically routes to live Render backend when hosted on Vercel
+const API_BASE = (window.location.hostname.includes("vercel.app") || window.location.hostname.includes("text-to-cad-static"))
+  ? "https://text-to-cad.onrender.com"
+  : (window.location.origin.startsWith("http") && !window.location.hostname.includes("localhost") && !window.location.hostname.includes("127.0.0.1") && !window.location.hostname.includes("onrender.com")
+      ? "https://text-to-cad.onrender.com"
+      : "");
+
 // State
 let currentProjectId = null;
 let currentStlMesh = null;
@@ -156,11 +164,12 @@ function getMaterial(type, wireframe = false) {
 // Load STL into scene
 function loadStlModel(url) {
   if (!url) return;
+  const fullUrl = (!url.startsWith("http") && API_BASE) ? API_BASE + url : url;
   viewportLoader.style.display = "flex";
 
   const loader = new THREE.STLLoader();
   loader.load(
-    url,
+    fullUrl,
     function (geometry) {
       if (currentStlMesh) {
         scene.remove(currentStlMesh);
@@ -225,7 +234,7 @@ async function handlePolishPrompt() {
   btnPolishPrompt.innerHTML = "Polishing...";
 
   try {
-    const res = await fetch("/api/polish-prompt", {
+    const res = await fetch(`${API_BASE}/api/polish-prompt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -270,7 +279,7 @@ async function handleGenerateCad() {
   buildOutput.textContent = "Compiling geometry with cadgen...\n";
 
   try {
-    const res = await fetch("/api/generate-cad", {
+    const res = await fetch(`${API_BASE}/api/generate-cad`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -330,7 +339,7 @@ async function handleApplyEdit() {
   viewportLoader.style.display = "flex";
 
   try {
-    const res = await fetch("/api/edit-cad", {
+    const res = await fetch(`${API_BASE}/api/edit-cad`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -401,7 +410,7 @@ function renderParameterControls(params) {
 // Load Project History
 async function loadProjectHistory() {
   try {
-    const res = await fetch("/api/projects");
+    const res = await fetch(`${API_BASE}/api/projects`);
     const projects = await res.json();
 
     if (!projects || projects.length === 0) {
@@ -453,7 +462,7 @@ async function loadProjectHistory() {
 // Delete a project completely
 async function deleteProject(id) {
   try {
-    const res = await fetch(`/api/project/${id}`, { method: "DELETE" });
+    const res = await fetch(`${API_BASE}/api/project/${id}`, { method: "DELETE" });
     const data = await res.json();
     if (res.ok && data.success) {
       if (currentProjectId === id) {
@@ -478,7 +487,7 @@ if (btnClearAllHistory) {
     try {
       btnClearAllHistory.disabled = true;
       btnClearAllHistory.textContent = "Clearing...";
-      await fetch("/api/projects", { method: "DELETE" });
+      await fetch(`${API_BASE}/api/projects`, { method: "DELETE" });
       startNewProject();
     } catch (err) {
       console.error("Failed to clear history:", err);
@@ -492,7 +501,7 @@ if (btnClearAllHistory) {
 // Select and load a project from history
 async function selectProject(id) {
   try {
-    const res = await fetch(`/api/project/${id}`);
+    const res = await fetch(`${API_BASE}/api/project/${id}`);
     const data = await res.json();
 
     currentProjectId = data.id;
@@ -573,7 +582,7 @@ btnToggleCodeView.addEventListener("click", () => {
 async function loadDynamicModels() {
   if (!aiModelSelect) return;
   try {
-    const res = await fetch("/api/models");
+    const res = await fetch(`${API_BASE}/api/models`);
     const data = await res.json();
     if (data.models && data.models.length > 0) {
       aiModelSelect.innerHTML = "";
@@ -652,7 +661,7 @@ async function fetchNewInspirations() {
   dynamicPresetList.innerHTML = `<span style="font-size:0.75rem; color:var(--text-muted); padding:4px 0;">Generating 3 unique ideas...</span>`;
 
   try {
-    const res = await fetch("/api/inspire");
+    const res = await fetch(`${API_BASE}/api/inspire`);
     const data = await res.json();
     const ideas = (data.ideas || data.presets || []).slice(0, 3);
     if (ideas.length > 0) {
@@ -705,13 +714,13 @@ materialSelector.addEventListener("change", (e) => {
 
 // Downloads
 btnDownloadStl.addEventListener("click", () => {
-  if (currentProjectId) window.open(`/api/download/${currentProjectId}/stl`, "_blank");
+  if (currentProjectId) window.open(`${API_BASE}/api/download/${currentProjectId}/stl`, "_blank");
 });
 btnDownloadStep.addEventListener("click", () => {
-  if (currentProjectId) window.open(`/api/download/${currentProjectId}/step`, "_blank");
+  if (currentProjectId) window.open(`${API_BASE}/api/download/${currentProjectId}/step`, "_blank");
 });
 btnDownloadCode.addEventListener("click", () => {
-  if (currentProjectId) window.open(`/api/download/${currentProjectId}/py`, "_blank");
+  if (currentProjectId) window.open(`${API_BASE}/api/download/${currentProjectId}/py`, "_blank");
 });
 
 // Deployment Modal
@@ -774,7 +783,7 @@ mobileTabs.forEach((btn) => {
 // Check backend Groq config
 async function checkEngineConfig() {
   try {
-    const res = await fetch("/api/config");
+    const res = await fetch(`${API_BASE}/api/config`);
     const data = await res.json();
     const badge = document.getElementById("groqStatusBadge");
     if (badge && data.groq_configured) {
