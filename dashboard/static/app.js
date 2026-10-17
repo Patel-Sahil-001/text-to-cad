@@ -58,6 +58,75 @@ const aiModelSelect = document.getElementById("aiModelSelect");
 const dynamicPresetList = document.getElementById("dynamicPresetList");
 const btnRefreshInspirations = document.getElementById("btnRefreshInspirations");
 
+// Compile Error Modal & Diagnostics Elements
+const compileErrorModal = document.getElementById("compileErrorModal");
+const btnCloseErrorModal = document.getElementById("btnCloseErrorModal");
+const btnCloseErrorModalBottom = document.getElementById("btnCloseErrorModalBottom");
+const btnOpenErrorModal = document.getElementById("btnOpenErrorModal");
+const errorModalTitle = document.getElementById("errorModalTitle");
+const errorModalBadge = document.getElementById("errorModalBadge");
+const errorModalWhy = document.getElementById("errorModalWhy");
+const errorModalSolution = document.getElementById("errorModalSolution");
+const errorModalRawLog = document.getElementById("errorModalRawLog");
+const btnCopyErrorLog = document.getElementById("btnCopyErrorLog");
+const btnCopyErrorLogText = document.getElementById("btnCopyErrorLogText");
+const btnAutoFixCode = document.getElementById("btnAutoFixCode");
+
+let lastErrorDiagnosis = null;
+let lastErrorRawLog = "";
+
+function showCompileErrorModal(diagnosis, rawLog) {
+  if (!compileErrorModal) return;
+
+  lastErrorDiagnosis = diagnosis;
+  lastErrorRawLog = rawLog || (diagnosis && diagnosis.raw_log) || "";
+
+  // Title
+  if (diagnosis && diagnosis.title) {
+    errorModalTitle.textContent = diagnosis.title;
+  } else {
+    errorModalTitle.textContent = "CAD Compilation Error";
+  }
+
+  // Category Badge
+  if (diagnosis && diagnosis.category) {
+    errorModalBadge.textContent = diagnosis.category;
+    errorModalBadge.className = `error-badge ${diagnosis.badge_color || "error"}`;
+  } else {
+    errorModalBadge.textContent = "Compile Error";
+    errorModalBadge.className = "error-badge error";
+  }
+
+  // Why this happened
+  if (diagnosis && diagnosis.why) {
+    errorModalWhy.textContent = diagnosis.why;
+  } else {
+    errorModalWhy.textContent = "The Python interpreter or OpenCASCADE geometric modeling kernel encountered an evaluation error.";
+  }
+
+  // Solution
+  if (diagnosis && diagnosis.solution) {
+    errorModalSolution.textContent = diagnosis.solution;
+  } else {
+    errorModalSolution.textContent = "Review the raw compiler output below to inspect the failing line, and ensure build123d API calls are valid.";
+  }
+
+  // Raw Traceback
+  errorModalRawLog.textContent = lastErrorRawLog || "No traceback logs available.";
+
+  // Show the header button in the compilation console
+  if (btnOpenErrorModal) {
+    btnOpenErrorModal.style.display = "inline-flex";
+  }
+
+  // Display modal popup
+  compileErrorModal.style.display = "flex";
+}
+
+function hideCompileErrorModal() {
+  if (compileErrorModal) compileErrorModal.style.display = "none";
+}
+
 // =============================================================================
 // THREE.JS VIEWPORT INITIALIZATION
 // =============================================================================
@@ -307,9 +376,19 @@ async function handleGenerateCad() {
       btnDownloadStep.disabled = !data.step_url;
       btnDownloadCode.disabled = false;
       if (window.innerWidth <= 1024) switchMobileTab("viewport");
+
+      // If an error occurred but was self-healed, keep diagnostic button available in console
+      if (data.error_diagnosis) {
+        lastErrorDiagnosis = data.error_diagnosis;
+        lastErrorRawLog = data.build_log || "";
+        if (btnOpenErrorModal) btnOpenErrorModal.style.display = "inline-flex";
+      } else {
+        if (btnOpenErrorModal) btnOpenErrorModal.style.display = "none";
+      }
     } else {
       viewportLoader.style.display = "none";
-      alert("Build failed. Inspect compilation console below for error details.");
+      // Show rich compilation error diagnostic modal popup
+      showCompileErrorModal(data.error_diagnosis, data.build_log);
     }
 
     renderParameterControls(currentParameters);
@@ -317,6 +396,13 @@ async function handleGenerateCad() {
   } catch (err) {
     viewportLoader.style.display = "none";
     buildOutput.textContent = "Network/execution error: " + err.message;
+    showCompileErrorModal({
+      category: "Network / Server Error",
+      badge_color: "error",
+      title: "API Connection Failed",
+      why: `The browser could not communicate with the CAD server (${API_BASE}). This typically occurs if the backend container is spinning up from cold sleep (on free cloud tiers) or if network connectivity is interrupted.`,
+      solution: "1. Please wait 15-30 seconds for the backend to wake up.\n2. Click 'Process & Generate 3D Model' again to re-attempt."
+    }, err.stack || err.message);
   } finally {
     btnGenerateCad.disabled = false;
     btnGenerateCad.innerHTML = `
@@ -330,7 +416,13 @@ async function handleApplyEdit() {
   const instruction = editInput.value.trim();
   if (!instruction) return;
   if (!currentProjectId) {
-    alert("Please generate or select a part first before editing.");
+    showCompileErrorModal({
+      category: "Action Required",
+      badge_color: "warning",
+      title: "No Active CAD Model",
+      why: "You attempted to apply an edit, but no CAD model has been generated or selected yet.",
+      solution: "Generate a 3D model first using Step 1 & Step 2 above, or select an existing design from the Saved Parts list."
+    }, "No active project loaded.");
     return;
   }
 
@@ -360,6 +452,16 @@ async function handleApplyEdit() {
 
     if (data.success && data.stl_url) {
       loadStlModel(data.stl_url + "?t=" + Date.now());
+      if (data.error_diagnosis) {
+        lastErrorDiagnosis = data.error_diagnosis;
+        lastErrorRawLog = data.build_log || "";
+        if (btnOpenErrorModal) btnOpenErrorModal.style.display = "inline-flex";
+      } else {
+        if (btnOpenErrorModal) btnOpenErrorModal.style.display = "none";
+      }
+    } else {
+      viewportLoader.style.display = "none";
+      showCompileErrorModal(data.error_diagnosis, data.build_log);
     }
 
     renderParameterControls(currentParameters);
@@ -367,7 +469,13 @@ async function handleApplyEdit() {
     loadProjectHistory();
   } catch (err) {
     viewportLoader.style.display = "none";
-    alert("Edit failed: " + err.message);
+    showCompileErrorModal({
+      category: "Edit Evaluation Error",
+      badge_color: "error",
+      title: "Failed to Apply Conversational Edit",
+      why: `An exception occurred during edit synthesis or compilation: ${err.message}`,
+      solution: "Ensure your edit prompt includes clear dimensions (e.g. 'Increase wall thickness to 5mm') and verify backend availability."
+    }, err.stack || err.message);
   } finally {
     btnApplyEdit.disabled = false;
     btnApplyEdit.innerHTML = `
@@ -740,6 +848,45 @@ if (btnCloseDeployModal && deployModal) {
   });
   deployModal.addEventListener("click", (e) => {
     if (e.target === deployModal) deployModal.style.display = "none";
+  });
+}
+
+// Compile Error Diagnostics Modal Listeners
+if (btnCloseErrorModal) {
+  btnCloseErrorModal.addEventListener("click", hideCompileErrorModal);
+}
+if (btnCloseErrorModalBottom) {
+  btnCloseErrorModalBottom.addEventListener("click", hideCompileErrorModal);
+}
+if (compileErrorModal) {
+  compileErrorModal.addEventListener("click", (e) => {
+    if (e.target === compileErrorModal) hideCompileErrorModal();
+  });
+}
+if (btnOpenErrorModal) {
+  btnOpenErrorModal.addEventListener("click", () => {
+    showCompileErrorModal(lastErrorDiagnosis, lastErrorRawLog);
+  });
+}
+if (btnCopyErrorLog && btnCopyErrorLogText) {
+  btnCopyErrorLog.addEventListener("click", () => {
+    const textToCopy = lastErrorRawLog || (errorModalRawLog ? errorModalRawLog.textContent : "") || "";
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      btnCopyErrorLogText.textContent = "Copied!";
+      setTimeout(() => {
+        btnCopyErrorLogText.textContent = "Copy Traceback";
+      }, 2000);
+    }).catch((err) => {
+      console.warn("Could not copy traceback:", err);
+    });
+  });
+}
+if (btnAutoFixCode) {
+  btnAutoFixCode.addEventListener("click", () => {
+    hideCompileErrorModal();
+    const diagTitle = (lastErrorDiagnosis && lastErrorDiagnosis.title) || "compiler error";
+    editInput.value = `Fix CAD compiler error: ${diagTitle}. Ensure valid build123d geometry and clean ASCII Python syntax with standard straight quotes.`;
+    handleApplyEdit();
   });
 }
 

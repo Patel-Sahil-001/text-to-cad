@@ -175,6 +175,170 @@ def parse_parameters_from_code(code: str) -> Dict[str, float]:
     return params
 
 
+def diagnose_compile_error(build_log: str, code: str = "") -> Dict[str, Any]:
+    """
+    Expert CAD Compiler Diagnostics:
+    Analyzes compiler output, traceback, and build logs to determine:
+    1. Error category and technical classification.
+    2. Plain-English root cause explanation ('Why this happened').
+    3. Actionable remediation steps ('How to fix it').
+    4. Relevant line number and code snippet when available.
+    """
+    log_lower = build_log.lower()
+
+    # 1. Memory Admission / cadgen daemon error
+    if "cadgen memory admission" in log_lower or "memoryadmissionerror" in log_lower:
+        match = re.search(r'(\d+\s*MiB\s*requested.*?exceeds.*?allowance)', build_log, re.IGNORECASE)
+        detail = f" ({match.group(1)})" if match else ""
+        return {
+            "has_error": True,
+            "category": "Daemon Memory Admission",
+            "badge_color": "warning",
+            "title": "Worker Memory Admission Rejected",
+            "why": f"The cadgen compiler daemon blocked worker creation because requested RAM exceeded the available container memory limit{detail}. On free/restricted cloud containers (such as Render 512MB RAM), the default 512MB reservation per worker exceeds container cgroups.",
+            "solution": "Set environment variable CADGEN_MEMORY_MB=0 to bypass worker memory admission reservations, or increase container RAM on your host.",
+            "raw_log": build_log,
+        }
+
+    # 2. Syntax Error (conversational text, invalid characters, bad syntax)
+    if "syntaxerror" in log_lower:
+        # Check for smart quote / non-ASCII character
+        char_match = re.search(r"invalid character ['\"]([^'\"]+)['\"]", build_log)
+        line_match = re.search(r'line\s+(\d+)', build_log, re.IGNORECASE)
+        line_num = line_match.group(1) if line_match else None
+
+        if char_match:
+            char_found = char_match.group(1)
+            return {
+                "has_error": True,
+                "category": "SyntaxError: Invalid Character",
+                "badge_color": "error",
+                "title": f"Invalid Non-ASCII Character '{char_found}'" + (f" on line {line_num}" if line_num else ""),
+                "why": f"The Python interpreter encountered a non-standard character '{char_found}' (such as a curly quote, smart apostrophe, or foreign symbol) instead of standard ASCII code. This commonly occurs when pasting code containing conversational AI chatter like \"I'm happy to help...\" directly into the script.",
+                "solution": "Replace smart/curly quotes with standard single (') or double (\") quotes, and ensure conversational text or intro greetings are removed from the Python editor.",
+                "line_number": line_num,
+                "raw_log": build_log,
+            }
+        
+        # General syntax error
+        return {
+            "has_error": True,
+            "category": "SyntaxError: Malformed Code",
+            "badge_color": "error",
+            "title": f"Python Syntax Error" + (f" on line {line_num}" if line_num else ""),
+            "why": "The script contains malformed Python syntax, such as an unclosed parenthesis, missing colon, unexpected indentation, or non-Python conversational text.",
+            "solution": "Check indentation, ensure all parentheses () and brackets [] are matched, and verify that all statements are valid Python code.",
+            "line_number": line_num,
+            "raw_log": build_log,
+        }
+
+    # 3. OpenCASCADE / BRep Kernel Geometric Failure
+    if any(k in build_log for k in ["BRep_", "Standard_ConstructionError", "Standard_Failure", "Geom_", "TopAbs_", "BRepMesh"]):
+        return {
+            "has_error": True,
+            "category": "Geometry Kernel Failure",
+            "badge_color": "error",
+            "title": "OpenCASCADE Solid Boolean / Topology Error",
+            "why": "The OpenCASCADE 3D solid modeling kernel failed while computing a boolean operation (cut, union, or fillet). This usually happens when cutting tool geometry has exactly coplanar/overlapping faces with the workpiece, creating non-manifold edges, or when an edge fillet radius is too large for the adjacent geometry.",
+            "solution": "1. Make drill/cutter tools slightly oversized (e.g. height * 1.2) so they penetrate completely through boundaries rather than sharing coplanar faces.\n2. Reduce fillet radii or replace aggressive fillets with chamfers.\n3. Ensure subtracting bodies actually intersect the target solid.",
+            "raw_log": build_log,
+        }
+
+    # 4. Timeout
+    if "timed out" in log_lower or "timeoutexpired" in log_lower:
+        return {
+            "has_error": True,
+            "category": "Execution Timeout",
+            "badge_color": "warning",
+            "title": "Geometry Computation Timed Out (> 40s)",
+            "why": "The CAD script exceeded the 40-second execution time limit. Complex solid meshing, fine curved tessellation, or high loop counts can cause the geometric kernel to hang.",
+            "solution": "Reduce loop counts, simplify boolean operations, or avoid dense fine-pattern cuts.",
+            "raw_log": build_log,
+        }
+
+    # 5. Missing Import or Module
+    if "modulenotfounderror" in log_lower or "importerror" in log_lower:
+        mod_match = re.search(r"no module named ['\"]([^'\"]+)['\"]", build_log, re.IGNORECASE)
+        mod_name = mod_match.group(1) if mod_match else "unknown"
+        return {
+            "has_error": True,
+            "category": "Import Error",
+            "badge_color": "error",
+            "title": f"Missing Python Module: '{mod_name}'",
+            "why": f"The script tried to import '{mod_name}', which is not available in the CAD runtime environment.",
+            "solution": "Use only built-in modules ('math') or supported CAD packages ('cadgen', 'build123d').",
+            "raw_log": build_log,
+        }
+
+    # 6. NameError / AttributeError / Undefined API
+    if "attributeerror" in log_lower:
+        attr_match = re.search(r"module ['\"][^'\"]+['\"] has no attribute ['\"]([^'\"]+)['\"]", build_log)
+        attr_str = attr_match.group(1) if attr_match else "attribute"
+        return {
+            "has_error": True,
+            "category": "AttributeError: Invalid API",
+            "badge_color": "error",
+            "title": f"Invalid build123d Attribute '{attr_str}'",
+            "why": f"The script called 'bd.{attr_str}' or referenced an attribute that does not exist in build123d. For operations like fillets or chamfers, build123d applies them to shape edges (e.g. 'part = part.chamfer(...)') rather than 'bd.{attr_str}'.",
+            "solution": f"Consult build123d API conventions: use constructors like 'bd.Box', 'bd.Cylinder', 'bd.Pos', 'bd.Rotation', and apply chamfers/fillets via edge methods.",
+            "raw_log": build_log,
+        }
+
+    if "nameerror" in log_lower:
+        name_match = re.search(r"name ['\"]([^'\"]+)['\"] is not defined", build_log)
+        name_str = name_match.group(1) if name_match else "variable"
+        return {
+            "has_error": True,
+            "category": "NameError: Undefined Identifier",
+            "badge_color": "error",
+            "title": f"Undefined Identifier '{name_str}'",
+            "why": f"The script tried to use '{name_str}', but it was never defined or imported. For build123d shapes, make sure to prefix with 'bd.' (e.g. 'bd.Pos(...)', 'bd.Box(...)').",
+            "solution": f"Define '{name_str}' or check for typos. If it is a build123d class, use 'bd.{name_str}'.",
+            "raw_log": build_log,
+        }
+
+    # 7. Division by zero / Math Domain
+    if "zerodivisionerror" in log_lower:
+        return {
+            "has_error": True,
+            "category": "Math Domain Error",
+            "badge_color": "error",
+            "title": "Division by Zero in Parameter Calculation",
+            "why": "A parametric dimension or offset calculation divided by zero, resulting in an undefined number.",
+            "solution": "Check your parameter values in the left sidebar and ensure no wall thickness, length, or clearance value is zero.",
+            "raw_log": build_log,
+        }
+
+    # 8. Output file missing
+    if "model.stl" in log_lower and "not found" in log_lower:
+        return {
+            "has_error": True,
+            "category": "Missing Output File",
+            "badge_color": "warning",
+            "title": "No STL Mesh Generated",
+            "why": "The script executed without a fatal Python crash, but failed to write 'model.stl'. This occurs if the main generation function is missing the @stl decorator or does not return a valid Part object.",
+            "solution": "Ensure your function is decorated with @stl(out=\"model.stl\") and @step(out=\"model.step\") and returns the constructed part.",
+            "raw_log": build_log,
+        }
+
+    # 9. Generic build failure / Extract specific FAILED: line
+    failed_match = re.search(r"FAILED:\s*([^\n\r]+)", build_log)
+    error_summary = failed_match.group(1).strip() if failed_match else ""
+    if not error_summary:
+        lines = [l.strip() for l in build_log.splitlines() if l.strip() and not l.startswith("{")]
+        error_summary = lines[-1] if lines else "Process terminated with non-zero exit code"
+
+    return {
+        "has_error": True,
+        "category": "CAD Compilation Failure",
+        "badge_color": "error",
+        "title": "Compilation Error: " + error_summary[:70],
+        "why": "The CAD script or build123d geometric engine threw an exception during evaluation.",
+        "solution": "Inspect the detailed traceback below to review the failing line number and exact stack trace.",
+        "raw_log": build_log,
+    }
+
+
 def generate_spec_with_groq(prompt: str, client: Any, model: str) -> str:
     """Dynamically synthesize an engineering specification using Groq."""
     sys_prompt = """You are a Principal Mechanical Engineer and CAD Systems Architect.
@@ -537,10 +701,11 @@ async def generate_cad(req: GenerateRequest):
     start_time = time.time()
     success = False
     build_log = ""
+    error_diagnosis = None
     sub_env = dict(os.environ, CADGEN_MEMORY_MB="0")
 
     # Execute build with automatic dynamic self-repair (up to 2 retry attempts)
-    max_attempts = 2 if client else 1
+    max_attempts = 2 if client and not req.code else 1
     for attempt in range(max_attempts):
         try:
             proc = subprocess.run(
@@ -559,6 +724,9 @@ async def generate_cad(req: GenerateRequest):
 
         if success:
             break
+
+        # Capture error diagnosis
+        error_diagnosis = diagnose_compile_error(build_log, code)
 
         # Dynamic AI self-repair
         if attempt < max_attempts - 1 and client:
@@ -579,8 +747,12 @@ async def generate_cad(req: GenerateRequest):
             except Exception:
                 pass
 
-    # Guaranteed safety net: if compilation failed or syntax error occurred, generate clean proportional geometry
-    if not success or not (project_dir / "model.stl").exists():
+    if not success and not error_diagnosis:
+        error_diagnosis = diagnose_compile_error(build_log, code)
+
+    # If the user did NOT supply custom code (pure prompt generation) and it still failed,
+    # generate a dynamic solid so they have something in viewport, but retain the error_diagnosis
+    if not success and not req.code:
         fallback_code = generate_dynamic_fallback(req.prompt)
         model_py.write_text(fallback_code, encoding="utf-8")
         try:
@@ -595,7 +767,7 @@ async def generate_cad(req: GenerateRequest):
             if proc.returncode == 0 and (project_dir / "model.stl").exists():
                 code = fallback_code
                 success = True
-                build_log += f"\n[Self-Healing CAD Engine] Dynamic parametric solid generated successfully."
+                build_log += f"\n[Self-Healing CAD Engine] Parametric solid generated successfully."
         except Exception:
             pass
 
@@ -612,6 +784,7 @@ async def generate_cad(req: GenerateRequest):
         "created_at": time.time(),
         "has_stl": (project_dir / "model.stl").exists(),
         "has_step": (project_dir / "model.step").exists(),
+        "error_diagnosis": error_diagnosis if not success else None,
     }
     (project_dir / "meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
@@ -627,6 +800,7 @@ async def generate_cad(req: GenerateRequest):
         "parameters": meta["parameters"],
         "stl_url": stl_url,
         "step_url": step_url,
+        "error_diagnosis": error_diagnosis,
     }
 
 

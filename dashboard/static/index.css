@@ -954,9 +954,204 @@ body::before {
   font-size: 0.78rem;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.98); }
-  to { opacity: 1; transform: scale(1); }
+/* CAD Compilation Error Modal & Diagnostics */
+.btn-error-diag {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  animation: pulseWarning 2s infinite ease-in-out;
+}
+
+.btn-error-diag:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+  border-color: #ef4444;
+}
+
+@keyframes pulseWarning {
+  0%, 100% { opacity: 0.9; box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+  50% { opacity: 1; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+}
+
+.modal-card-error {
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(239, 68, 68, 0.2);
+  max-width: 660px;
+}
+
+.modal-header-error {
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-error-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: #f87171;
+  text-transform: uppercase;
+}
+
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.error-badge {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  white-space: nowrap;
+}
+
+.error-badge.warning {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+.diag-section {
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.diag-section:last-child {
+  margin-bottom: 0;
+}
+
+.diag-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.diag-section-header h4 {
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.diag-icon {
+  font-size: 1rem;
+}
+
+.diag-section-why {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.diag-section-why h4 {
+  color: #f87171;
+}
+
+.diag-section-solution {
+  background: rgba(0, 242, 254, 0.05);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.diag-section-solution h4 {
+  color: var(--accent-cyan);
+}
+
+.diag-text {
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: #e2e8f0;
+  white-space: pre-line;
+}
+
+.diag-section-log {
+  background: #040711;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.diag-section-log h4 {
+  color: #94a3b8;
+}
+
+.diag-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.btn-copy-log {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  transition: all 0.2s ease;
+}
+
+.btn-copy-log:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.diag-raw-pre {
+  background: #020409;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #fda4af;
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* ==========================================================================

@@ -190,7 +190,12 @@
         <div class="card terminal-card" id="terminalCard">
           <div class="terminal-header">
             <span>COMPILATION & BUILD CONSOLE</span>
-            <span class="build-timer" id="buildTimer">0.00s</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button class="btn-xs btn-error-diag" id="btnOpenErrorModal" style="display: none;" title="Open compiler diagnostic popup">
+                ⚠️ View Error Diagnostic
+              </button>
+              <span class="build-timer" id="buildTimer">0.00s</span>
+            </div>
           </div>
           <pre id="buildOutput" class="terminal-body">Engine ready. Waiting for generation task...</pre>
         </div>
@@ -254,6 +259,68 @@
         </div>
       </section>
     </main>
+
+  <!-- CAD Compilation Error Diagnostics Modal -->
+  <div class="modal-backdrop" id="compileErrorModal" style="display: none;">
+    <div class="modal-card modal-card-error">
+      <div class="modal-header modal-header-error">
+        <div class="modal-title-group">
+          <div class="modal-error-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          </div>
+          <div>
+            <div class="modal-subtitle">CAD COMPILATION DIAGNOSTICS</div>
+            <h3 id="errorModalTitle">Compilation Error Detected</h3>
+          </div>
+        </div>
+        <div class="modal-header-actions">
+          <span class="error-badge" id="errorModalBadge">Error</span>
+          <button class="modal-close-btn" id="btnCloseErrorModal" title="Close Diagnostics">×</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <!-- Root Cause: Why this happened -->
+        <div class="diag-section diag-section-why">
+          <div class="diag-section-header">
+            <span class="diag-icon">❓</span>
+            <h4>Why This Happened</h4>
+          </div>
+          <p id="errorModalWhy" class="diag-text">The CAD compiler encountered an error during code evaluation.</p>
+        </div>
+
+        <!-- Actionable Solution: How to fix it -->
+        <div class="diag-section diag-section-solution">
+          <div class="diag-section-header">
+            <span class="diag-icon">💡</span>
+            <h4>Recommended Solution</h4>
+          </div>
+          <div id="errorModalSolution" class="diag-text">Review the script and correct the failing syntax or geometry.</div>
+        </div>
+
+        <!-- Raw Traceback & Compiler Log -->
+        <div class="diag-section diag-section-log">
+          <div class="diag-section-header diag-log-header">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="diag-icon">📜</span>
+              <h4>Raw Compiler Log & Traceback</h4>
+            </div>
+            <button class="btn btn-xs btn-copy-log" id="btnCopyErrorLog" title="Copy full compiler output">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <span id="btnCopyErrorLogText">Copy Traceback</span>
+            </button>
+          </div>
+          <pre id="errorModalRawLog" class="diag-raw-pre">Waiting for compiler logs...</pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btnCloseErrorModalBottom">Close</button>
+        <button class="btn btn-primary btn-sm" id="btnAutoFixCode">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+          Ask AI to Auto-Fix Code
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Deployment & Storage Guide Modal -->
   <div class="modal-backdrop" id="deployModal" style="display: none;">
