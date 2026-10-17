@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY dashboard /app/dashboard
-COPY .env /app/.env
+COPY .env* /app/
 
 WORKDIR /app/dashboard
 
