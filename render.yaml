@@ -11,3 +11,5 @@ services:
         value: openai/gpt-oss-120b
       - key: PORT
         value: 8000
+      - key: CADGEN_MEMORY_MB
+        value: "0"

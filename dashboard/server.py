@@ -50,6 +50,8 @@ if not os.path.exists(PYTHON_EXE):
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+# Disable restrictive cadgen memory admission so worker starts smoothly in 512MB containers
+os.environ["CADGEN_MEMORY_MB"] = "0"
 
 app = FastAPI(title="Text-to-CAD Dynamic Studio")
 
@@ -535,6 +537,7 @@ async def generate_cad(req: GenerateRequest):
     start_time = time.time()
     success = False
     build_log = ""
+    sub_env = dict(os.environ, CADGEN_MEMORY_MB="0")
 
     # Execute build with automatic dynamic self-repair (up to 2 retry attempts)
     max_attempts = 2 if client else 1
@@ -543,6 +546,7 @@ async def generate_cad(req: GenerateRequest):
             proc = subprocess.run(
                 [PYTHON_EXE, "model.py"],
                 cwd=str(project_dir),
+                env=sub_env,
                 capture_output=True,
                 text=True,
                 timeout=40,
@@ -583,6 +587,7 @@ async def generate_cad(req: GenerateRequest):
             proc = subprocess.run(
                 [PYTHON_EXE, "model.py"],
                 cwd=str(project_dir),
+                env=sub_env,
                 capture_output=True,
                 text=True,
                 timeout=40,
