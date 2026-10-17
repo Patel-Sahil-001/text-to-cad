@@ -365,6 +365,7 @@ async function handleGenerateCad() {
   try {
     const res = await fetch(`${API_BASE}/api/generate-cad`, {
       method: "POST",
+      mode: "cors",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         project_id: currentProjectId,
@@ -451,6 +452,7 @@ async function handleApplyEdit() {
   try {
     const res = await fetch(`${API_BASE}/api/edit-cad`, {
       method: "POST",
+      mode: "cors",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         project_id: currentProjectId,
