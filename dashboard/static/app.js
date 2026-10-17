@@ -568,38 +568,88 @@ async function loadDynamicModels() {
   }
 }
 
-async function loadDynamicInspirations(topic = "") {
+const INITIAL_INSPIRATIONS = [
+  {
+    title: "Action Cam Mount",
+    prompt: "Action camera three-prong mounting bracket with ergonomic handle grip and 1/4-20 tripod adapter"
+  },
+  {
+    title: "Linear Bearing Block",
+    prompt: "SC8UU 8mm linear ball bearing pillow block with 4 M4 mounting threads and lightweight skeleton cutout"
+  },
+  {
+    title: "Drone Motor Arm",
+    prompt: "Carbon-compatible quadcopter motor arm for 2207 brushless motor with wire routing and 16x19mm M3 pattern"
+  }
+];
+
+function renderInspirations(ideasList) {
   if (!dynamicPresetList) return;
-  dynamicPresetList.innerHTML = `<span style="font-size:0.75rem; color:var(--text-muted); padding:4px 0;">Generating dynamic design ideas...</span>`;
+  dynamicPresetList.innerHTML = "";
+  // Display only 3 items
+  const threeIdeas = (ideasList || []).slice(0, 3);
+  threeIdeas.forEach((idea) => {
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "preset-pill";
+    pill.textContent = idea.title || idea.label || "Design Idea";
+    pill.title = idea.prompt;
+    pill.addEventListener("click", () => {
+      promptInput.value = idea.prompt;
+      handlePolishPrompt();
+    });
+    dynamicPresetList.appendChild(pill);
+  });
+}
+
+// Loads existing inspirations from localStorage or defaults on visit (does NOT make API requests on page load)
+function initInspirations() {
+  const cached = localStorage.getItem("text_to_cad_inspirations");
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        renderInspirations(parsed);
+        return;
+      }
+    } catch (e) {
+      console.warn("Could not parse cached inspirations:", e);
+    }
+  }
+  renderInspirations(INITIAL_INSPIRATIONS);
+  localStorage.setItem("text_to_cad_inspirations", JSON.stringify(INITIAL_INSPIRATIONS));
+}
+
+// ONLY called when the user explicitly clicks the "✨ New Ideas" button
+async function fetchNewInspirations() {
+  if (!dynamicPresetList || !btnRefreshInspirations) return;
+
+  btnRefreshInspirations.disabled = true;
+  const originalHtml = btnRefreshInspirations.innerHTML;
+  btnRefreshInspirations.innerHTML = "⏳ Thinking...";
+  dynamicPresetList.innerHTML = `<span style="font-size:0.75rem; color:var(--text-muted); padding:4px 0;">Generating 3 unique ideas...</span>`;
+
   try {
-    const res = await fetch(`/api/inspire${topic ? "?topic=" + encodeURIComponent(topic) : ""}`);
+    const res = await fetch("/api/inspire");
     const data = await res.json();
-    const ideas = data.ideas || data.presets || [];
-    dynamicPresetList.innerHTML = "";
+    const ideas = (data.ideas || data.presets || []).slice(0, 3);
     if (ideas.length > 0) {
-      ideas.forEach((idea) => {
-        const pill = document.createElement("button");
-        pill.type = "button";
-        pill.className = "preset-pill";
-        pill.textContent = idea.title || idea.label || "Design Idea";
-        pill.title = idea.prompt;
-        pill.addEventListener("click", () => {
-          promptInput.value = idea.prompt;
-          handlePolishPrompt();
-        });
-        dynamicPresetList.appendChild(pill);
-      });
+      localStorage.setItem("text_to_cad_inspirations", JSON.stringify(ideas));
+      renderInspirations(ideas);
+    } else {
+      initInspirations();
     }
   } catch (err) {
-    console.warn("Could not fetch inspirations:", err);
-    dynamicPresetList.innerHTML = "";
+    console.warn("Could not fetch unique inspirations:", err);
+    initInspirations();
+  } finally {
+    btnRefreshInspirations.disabled = false;
+    btnRefreshInspirations.innerHTML = originalHtml;
   }
 }
 
 if (btnRefreshInspirations) {
-  btnRefreshInspirations.addEventListener("click", () => {
-    loadDynamicInspirations();
-  });
+  btnRefreshInspirations.addEventListener("click", fetchNewInspirations);
 }
 
 // Viewport Controls
@@ -719,6 +769,6 @@ window.addEventListener("DOMContentLoaded", () => {
   loadProjectHistory();
   checkEngineConfig();
   loadDynamicModels();
-  loadDynamicInspirations();
+  initInspirations();
   switchMobileTab("editor"); // Default to editor view on mobile
 });

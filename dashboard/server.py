@@ -12,6 +12,7 @@ import time
 import re
 import subprocess
 import shutil
+import random
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
@@ -347,45 +348,61 @@ async def list_available_models(apiKey: Optional[str] = None):
         }
 
 
+CAD_INSPIRATION_DOMAINS = [
+    "robotics linkages, gripper claws, and micro-servo gearboxes",
+    "compact aerospace, folding drone arms, and motor heatsinks",
+    "ergonomic hand tools, magnetic bit holders, and thumb ratchets",
+    "cinematography rigs, quick-release camera plates, and gimbal mounts",
+    "smart workbench fixtures, DIN-rail PCB cases, and cable organizers",
+    "bionic lattice structures, compliant mechanisms, and snap hinges",
+    "automotive sensor brackets, intake adapters, and tubing manifolds"
+]
+
 @app.api_route("/api/inspire", methods=["GET", "POST"])
 async def get_dynamic_inspirations(
-    topic: Optional[str] = "functional mechanical and 3D printing components",
+    topic: Optional[str] = None,
     apiKey: Optional[str] = None,
     model: Optional[str] = None
 ):
-    """Dynamically generate fresh, creative CAD engineering prompt ideas."""
+    """Dynamically generate exactly 3 fresh, unique CAD engineering prompt ideas."""
     client = get_groq_client(apiKey)
     selected_model = model or DEFAULT_MODEL
+    chosen_topic = topic or random.choice(CAD_INSPIRATION_DOMAINS)
 
     if client:
         try:
             resp = client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "You are a creative mechanical design engineer."},
-                    {"role": "user", "content": f"Generate 5 distinct, practical 3D CAD design prompts for {topic}. Output ONLY a JSON list of objects with 'title' (2-3 words) and 'prompt' (1-2 sentences with dimensions in mm). Format: [{{\"title\": \"...\", \"prompt\": \"...\"}}]"}
+                    {"role": "system", "content": "You are a creative mechanical design and CAD innovator."},
+                    {"role": "user", "content": f"Generate exactly 3 completely unique, inventive, and practical 3D CAD design concepts for {chosen_topic}. Make each concept distinct and specify key dimensions in mm. Output ONLY a JSON list of exactly 3 objects with 'title' (2-3 words) and 'prompt' (1-2 sentences with dimensions in mm). Format: [{{\"title\": \"...\", \"prompt\": \"...\"}}]"}
                 ],
                 model=selected_model,
-                max_tokens=600,
-                temperature=0.8
+                max_tokens=500,
+                temperature=0.95
             )
             raw = resp.choices[0].message.content
             # Extract JSON from response
             json_match = re.search(r'\[\s*\{.*\}\s*\]', raw, re.DOTALL)
             if json_match:
                 presets = json.loads(json_match.group(0))
-                return {"presets": presets, "ideas": presets}
+                # Guarantee exactly 3
+                return {"presets": presets[:3], "ideas": presets[:3]}
         except Exception:
             pass
 
-    # Dynamic fallback presets if offline
-    fallback = [
+    # Diverse offline fallback pool; randomly sample 3 every time
+    fallback_pool = [
         {"title": "Drone Motor Arm", "prompt": "Carbon-compatible quadcopter motor arm for 2207 brushless motor with wire routing and 16x19mm M3 pattern"},
         {"title": "Action Cam Mount", "prompt": "Action camera three-prong mounting bracket with ergonomic handle grip and 1/4-20 tripod adapter"},
         {"title": "Linear Bearing Block", "prompt": "SC8UU 8mm linear ball bearing pillow block with 4 M4 mounting threads and lightweight skeleton cutout"},
         {"title": "Cable Chain Link", "prompt": "Snap-together openable cable drag chain link with 45-degree bending limit and 15x20mm inner channel"},
-        {"title": "Fan Shroud Duct", "prompt": "5015 radial blower fan duct adapter to 40mm V6 hotend with dual directional cooling nozzles"}
+        {"title": "Fan Shroud Duct", "prompt": "5015 radial blower fan duct adapter to 40mm V6 hotend with dual directional cooling nozzles"},
+        {"title": "Robotic Gripper Jaw", "prompt": "Compliant finger gripper jaw with silicone pad pocket and standard MG996R servo horn spline"},
+        {"title": "Magnetic Bit Caddy", "prompt": "Hex screwdriver bit holder block with 8 neodymium 6x3mm magnet recesses and angled visual display"},
+        {"title": "DIN-Rail Pi Holder", "prompt": "35mm top-hat DIN-rail snap bracket for Raspberry Pi 4 with 2.5mm standoffs and M2.5 mounting bosses"}
     ]
-    return {"presets": fallback, "ideas": fallback}
+    sampled = random.sample(fallback_pool, 3)
+    return {"presets": sampled, "ideas": sampled}
 
 
 @app.post("/api/polish-prompt")
