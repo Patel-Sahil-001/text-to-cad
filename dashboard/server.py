@@ -553,6 +553,50 @@ async def get_config():
     }
 
 
+@app.get("/api/test-compile")
+async def test_compile():
+    """Diagnostics endpoint: measures exact compile time and output on host."""
+    test_dir = PROJECTS_DIR / "test_compile"
+    test_dir.mkdir(parents=True, exist_ok=True)
+    test_file = test_dir / "model.py"
+    test_file.write_text('''from cadgen import build123d as bd
+from cadgen import step, stl
+
+@stl(out="model.stl")
+@step(out="model.step")
+def test_part():
+    return bd.Box(10, 10, 10)
+
+if __name__ == "__main__":
+    test_part()
+''', encoding="utf-8")
+    t0 = time.time()
+    sub_env = dict(os.environ, CADGEN_MEMORY_MB="0")
+    try:
+        proc = subprocess.run(
+            [PYTHON_EXE, "model.py"],
+            cwd=str(test_dir),
+            env=sub_env,
+            capture_output=True,
+            text=True,
+            timeout=25,
+        )
+        return {
+            "elapsed": round(time.time() - t0, 2),
+            "returncode": proc.returncode,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "has_stl": (test_dir / "model.stl").exists(),
+            "python_exe": PYTHON_EXE,
+        }
+    except Exception as e:
+        return {
+            "elapsed": round(time.time() - t0, 2),
+            "error": str(e),
+            "python_exe": PYTHON_EXE,
+        }
+
+
 @app.get("/api/models")
 async def list_available_models(apiKey: Optional[str] = None):
     """Dynamically query Groq API for all available chat/text models."""
