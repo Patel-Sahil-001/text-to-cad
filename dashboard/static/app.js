@@ -415,17 +415,55 @@ async function loadProjectHistory() {
       el.className = `history-item ${proj.id === currentProjectId ? "active" : ""}`;
       const timeStr = new Date(proj.created_at * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       el.innerHTML = `
-        <div class="history-item-title">${proj.title}</div>
+        <div class="history-item-top">
+          <div class="history-item-title" title="${proj.title}">${proj.title}</div>
+          <button class="btn-delete-part" title="Delete part & all 3D files" aria-label="Delete part">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>
         <div class="history-item-meta">
           <span>${proj.id}</span>
           <span>${timeStr}</span>
         </div>
       `;
+
+      // Click to load project
       el.addEventListener("click", () => selectProject(proj.id));
+
+      // Click to delete project
+      const deleteBtn = el.querySelector(".btn-delete-part");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if (confirm(`Permanently delete "${proj.title}" and remove all generated 3D files?`)) {
+            await deleteProject(proj.id);
+          }
+        });
+      }
+
       projectHistoryList.appendChild(el);
     });
   } catch (err) {
     console.error("Failed to load history:", err);
+  }
+}
+
+// Delete a project completely
+async function deleteProject(id) {
+  try {
+    const res = await fetch(`/api/project/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (currentProjectId === id) {
+        startNewProject();
+      } else {
+        loadProjectHistory();
+      }
+    } else {
+      alert("Failed to delete project: " + (data.detail || data.message || "Unknown error"));
+    }
+  } catch (err) {
+    alert("Error deleting project: " + err.message);
   }
 }
 

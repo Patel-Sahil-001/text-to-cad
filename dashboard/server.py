@@ -11,6 +11,7 @@ import uuid
 import time
 import re
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
@@ -594,6 +595,24 @@ async def get_project(project_id: str):
     meta["stl_url"] = f"/outputs/{project_id}/model.stl" if (project_dir / "model.stl").exists() else None
     meta["step_url"] = f"/outputs/{project_id}/model.step" if (project_dir / "model.step").exists() else None
     return meta
+
+
+@app.delete("/api/project/{project_id}")
+async def delete_project(project_id: str):
+    """Permanently delete a project and all its generated files (STL, STEP, code, meta)."""
+    clean_id = re.sub(r'[^a-zA-Z0-9_\-]', '', project_id)
+    if not clean_id:
+        raise HTTPException(status_code=400, detail="Invalid project ID")
+
+    project_dir = PROJECTS_DIR / clean_id
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        shutil.rmtree(project_dir)
+        return {"success": True, "message": f"Project {clean_id} completely removed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
 
 
 @app.get("/api/download/{project_id}/{file_type}")
