@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text-to-CAD Studio | AI CAD Generation & Editing Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+  <!-- Three.js and STLLoader -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Header -->
+    <header class="studio-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>TEXT-TO-CAD <span>STUDIO</span></h1>
+          <p>Parametric AI CAD Synthesis & STEP/STL Compiler</p>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <span class="status-badge" id="engineStatusBadge">
+          <span class="status-dot"></span> cadgen 0.7.21 Ready
+        </span>
+        <span class="status-badge groq-badge" id="groqStatusBadge">
+          <span class="status-dot groq-dot"></span> Groq AI Connected
+        </span>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" id="btnNewProject" title="Start fresh design">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          New Part
+        </button>
+        <button class="btn btn-accent btn-sm" id="btnDeployModal" title="Deployment Guide for Render & Vercel">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          Deploy
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Studio Workspace -->
+    <main class="studio-body">
+      <!-- Left Sidebar: History & Quick Presets -->
+      <aside class="sidebar-panel">
+        <div class="sidebar-section">
+          <div class="section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            QUICK STARTERS
+          </div>
+          <div class="preset-list">
+            <button class="preset-pill" data-prompt="L-shaped mounting bracket with two mounting holes on base and one on wall, 60x30x25mm">
+              Mounting Bracket
+            </button>
+            <button class="preset-pill" data-prompt="Parametric electronics enclosure with internal mounting standoffs, 90x60x28mm, 2.5mm wall">
+              Electronics Enclosure
+            </button>
+            <button class="preset-pill" data-prompt="20-tooth GT2 timing pulley with 5mm shaft bore and dual side flanges">
+              Timing Pulley
+            </button>
+            <button class="preset-pill" data-prompt="Pipe flange adapter with 4-bolt circular pattern and 25mm center bore">
+              Pipe Flange
+            </button>
+            <button class="preset-pill" data-prompt="Knurled control knob with 6mm shaft bore and pointer skirt">
+              Control Knob
+            </button>
+          </div>
+        </div>
+
+        <div class="sidebar-section history-section">
+          <div class="section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            SAVED PARTS
+          </div>
+          <div class="project-history-list" id="projectHistoryList">
+            <div class="empty-state">No saved designs yet</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Studio Column: Prompting, Polishing, Editing -->
+      <section class="editor-panel">
+        <!-- Step 1: Prompt Input -->
+        <div class="card prompt-card">
+          <div class="card-header">
+            <div class="step-indicator">STEP 1</div>
+            <h2>Describe What You Want to Build</h2>
+          </div>
+          <div class="prompt-input-wrapper">
+            <textarea id="promptInput" rows="3" placeholder="e.g., Parametric mounting bracket with 2 bolt holes, 65mm long, 35mm wide, 35mm tall, 5mm thickness..."></textarea>
+            <div class="prompt-bar-footer">
+              <span class="hint-text">Natural language prompt will be refined into an engineering spec</span>
+              <button class="btn btn-primary" id="btnPolishPrompt">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+                Polish with AI
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Polished Spec & Code Generation -->
+        <div class="card spec-card" id="specCard">
+          <div class="card-header">
+            <div class="step-indicator">STEP 2</div>
+            <h2>AI-Polished Engineering Specification</h2>
+            <div class="card-actions">
+              <button class="btn btn-secondary btn-xs" id="btnToggleCodeView">Show Python Code</button>
+            </div>
+          </div>
+
+          <div class="spec-content-wrapper">
+            <textarea id="polishedSpecText" rows="6" placeholder="Click 'Polish with AI' to generate the technical breakdown..."></textarea>
+          </div>
+
+          <!-- Code / Parameter Drawer (hidden by default or toggled) -->
+          <div class="code-editor-wrapper" id="codeEditorWrapper" style="display: none;">
+            <div class="code-header">
+              <span>build123d Python Source</span>
+              <span class="code-badge">cadgen-compatible</span>
+            </div>
+            <textarea id="cadCodeInput" rows="12" spellcheck="false"></textarea>
+          </div>
+
+          <!-- Interactive Parameter Sliders (Auto-extracted from code) -->
+          <div class="parameters-container" id="parametersContainer" style="display: none;">
+            <div class="param-header">Live Parameters (Direct Adjustments)</div>
+            <div class="params-grid" id="paramsGrid"></div>
+          </div>
+
+          <div class="spec-footer">
+            <button class="btn btn-generate" id="btnGenerateCad">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              Process & Generate 3D Model
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3: Conversational Editing (For existing or active part) -->
+        <div class="card edit-card" id="editCard">
+          <div class="card-header">
+            <div class="step-indicator">EDIT</div>
+            <h2>Modify & Evolve This Design</h2>
+          </div>
+          <div class="edit-input-wrapper">
+            <input type="text" id="editInput" placeholder="e.g. Increase height to 45mm, add 4 corner holes, or change thickness to 6mm...">
+            <button class="btn btn-secondary" id="btnApplyEdit">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              Apply Edit
+            </button>
+          </div>
+        </div>
+
+        <!-- Build Terminal / Logs -->
+        <div class="card terminal-card" id="terminalCard">
+          <div class="terminal-header">
+            <span>COMPILATION & BUILD CONSOLE</span>
+            <span class="build-timer" id="buildTimer">0.00s</span>
+          </div>
+          <pre id="buildOutput" class="terminal-body">Engine ready. Waiting for generation task...</pre>
+        </div>
+      </section>
+
+      <!-- Right Column: Interactive 3D Viewport -->
+      <section class="viewport-panel">
+        <div class="viewport-card">
+          <div class="viewport-toolbar">
+            <div class="viewport-title">
+              <span class="pulse-dot"></span>
+              <span id="activeModelName">3D STL Preview</span>
+            </div>
+            <div class="viewport-controls">
+              <button class="tool-btn" id="btnResetView" title="Reset Camera View">⟲ Reset</button>
+              <button class="tool-btn" id="btnToggleWireframe" title="Toggle Wireframe">Wireframe</button>
+              <button class="tool-btn" id="btnToggleGrid" title="Toggle Grid">Grid</button>
+              <select id="materialSelector" class="tool-select">
+                <option value="metallic">Metallic Chrome</option>
+                <option value="cadBlue" selected>CAD Matte Blue</option>
+                <option value="orange">Engineering Orange</option>
+                <option value="clay">Studio Clay</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- WebGL Three.js Container -->
+          <div id="threeContainer" class="three-container">
+            <!-- Dimensions HUD Overlay -->
+            <div class="dimension-hud" id="dimensionHud">
+              <div class="hud-item"><span class="hud-label">WIDTH (X):</span> <span id="dimX">-</span> mm</div>
+              <div class="hud-item"><span class="hud-label">DEPTH (Y):</span> <span id="dimY">-</span> mm</div>
+              <div class="hud-item"><span class="hud-label">HEIGHT (Z):</span> <span id="dimZ">-</span> mm</div>
+            </div>
+
+            <!-- Loading Spinner Overlay -->
+            <div class="viewport-loader" id="viewportLoader" style="display: none;">
+              <div class="spinner"></div>
+              <span>Compiling with cadgen...</span>
+            </div>
+          </div>
+
+          <!-- Bottom Export Bar -->
+          <div class="export-toolbar">
+            <div class="export-title">EXPORTS & ARTIFACTS</div>
+            <div class="export-buttons">
+              <button class="btn btn-download" id="btnDownloadStl" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download STL (.stl)
+              </button>
+              <button class="btn btn-download" id="btnDownloadStep" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download STEP (.step)
+              </button>
+              <button class="btn btn-download-code" id="btnDownloadCode" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                Python (.py)
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+  <!-- Deployment Guide Modal -->
+  <div class="modal-backdrop" id="deployModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Deploying to Render & Vercel</h3>
+        <button class="modal-close-btn" id="btnCloseDeployModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="deploy-tab-group">
+          <h4>Option A: Deploy to Render (Recommended for full CAD Compiler)</h4>
+          <p class="deploy-desc">Render runs the complete Python & OpenCASCADE CAD compiler container seamlessly using the provided <code>Dockerfile</code> and <code>render.yaml</code>.</p>
+          <ol class="deploy-steps">
+            <li>Push this repository to your GitHub account (<code>Patel-Sahil-001/text-to-cad</code>).</li>
+            <li>Go to <a href="https://dashboard.render.com" target="_blank" style="color: var(--accent-cyan);">dashboard.render.com</a> &rarr; <strong>New +</strong> &rarr; <strong>Web Service</strong>.</li>
+            <li>Connect your repository. Render will automatically detect <code>Dockerfile</code>.</li>
+            <li>Under <strong>Environment Variables</strong>, add:
+              <br><code>GROQ_API_KEY</code> = <code>(your groq key)</code>
+              <br><code>GROQ_MODEL</code> = <code>openai/gpt-oss-120b</code>
+            </li>
+            <li>Click <strong>Deploy Web Service</strong>. Done!</li>
+          </ol>
+        </div>
+
+        <div class="deploy-tab-group" style="margin-top: 16px;">
+          <h4>Option B: Deploy to Vercel</h4>
+          <p class="deploy-desc">Vercel can host the static frontend dashboard and connect to your Render backend API.</p>
+          <ol class="deploy-steps">
+            <li>Import this repository at <a href="https://vercel.com/new" target="_blank" style="color: var(--accent-cyan);">vercel.com/new</a>.</li>
+            <li>The included <code>vercel.json</code> serves the static dashboard at <code>dashboard/static</code>.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

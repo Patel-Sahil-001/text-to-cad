@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: text-to-cad-studio
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: standard
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: PORT
+        value: 8000
