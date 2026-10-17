@@ -430,14 +430,16 @@ async function loadProjectHistory() {
       // Click to load project
       el.addEventListener("click", () => selectProject(proj.id));
 
-      // Click to delete project
+      // Click to delete project immediately with smooth feedback
       const deleteBtn = el.querySelector(".btn-delete-part");
       if (deleteBtn) {
         deleteBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
           e.stopPropagation();
-          if (confirm(`Permanently delete "${proj.title}" and remove all generated 3D files?`)) {
-            await deleteProject(proj.id);
-          }
+          el.style.transition = "all 0.2s ease";
+          el.style.opacity = "0.2";
+          el.style.transform = "translateX(-8px)";
+          await deleteProject(proj.id);
         });
       }
 
@@ -457,14 +459,34 @@ async function deleteProject(id) {
       if (currentProjectId === id) {
         startNewProject();
       } else {
-        loadProjectHistory();
+        await loadProjectHistory();
       }
     } else {
-      alert("Failed to delete project: " + (data.detail || data.message || "Unknown error"));
+      console.warn("Failed to delete project:", data);
+      await loadProjectHistory();
     }
   } catch (err) {
-    alert("Error deleting project: " + err.message);
+    console.error("Error deleting project:", err);
+    await loadProjectHistory();
   }
+}
+
+// Clear all past projects
+const btnClearAllHistory = document.getElementById("btnClearAllHistory");
+if (btnClearAllHistory) {
+  btnClearAllHistory.addEventListener("click", async () => {
+    try {
+      btnClearAllHistory.disabled = true;
+      btnClearAllHistory.textContent = "Clearing...";
+      await fetch("/api/projects", { method: "DELETE" });
+      startNewProject();
+    } catch (err) {
+      console.error("Failed to clear history:", err);
+    } finally {
+      btnClearAllHistory.disabled = false;
+      btnClearAllHistory.textContent = "Clear All";
+    }
+  });
 }
 
 // Select and load a project from history

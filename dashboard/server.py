@@ -675,6 +675,15 @@ async def get_project(project_id: str):
     return meta
 
 
+def _force_remove_readonly(func, path, excinfo):
+    try:
+        import stat
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+
 @app.delete("/api/project/{project_id}")
 async def delete_project(project_id: str):
     """Permanently delete a project and all its generated files (STL, STEP, code, meta)."""
@@ -684,13 +693,30 @@ async def delete_project(project_id: str):
 
     project_dir = PROJECTS_DIR / clean_id
     if not project_dir.exists():
-        raise HTTPException(status_code=404, detail="Project not found")
+        return {"success": True, "message": f"Project {clean_id} already deleted"}
 
     try:
-        shutil.rmtree(project_dir)
+        shutil.rmtree(project_dir, onerror=_force_remove_readonly)
         return {"success": True, "message": f"Project {clean_id} completely removed"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
+
+
+@app.delete("/api/projects")
+async def clear_all_projects():
+    """Permanently delete ALL saved projects and wipe the projects workspace."""
+    try:
+        count = 0
+        for p in PROJECTS_DIR.iterdir():
+            if p.is_dir():
+                try:
+                    shutil.rmtree(p, onerror=_force_remove_readonly)
+                    count += 1
+                except Exception:
+                    pass
+        return {"success": True, "message": f"Cleared {count} past parts"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear projects: {str(e)}")
 
 
 @app.get("/api/download/{project_id}/{file_type}")

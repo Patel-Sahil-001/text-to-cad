@@ -3,7 +3,7 @@ services:
     name: text-to-cad-studio
     env: docker
     dockerfilePath: Dockerfile
-    plan: standard
+    plan: free
     envVars:
       - key: GROQ_API_KEY
         sync: false

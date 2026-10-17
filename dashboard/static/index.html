@@ -90,9 +90,14 @@
         </div>
 
         <div class="sidebar-section history-section">
-          <div class="section-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            SAVED PARTS
+          <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              SAVED PARTS
+            </div>
+            <button class="btn btn-secondary btn-xs" id="btnClearAllHistory" title="Clear all saved parts" style="font-size: 0.68rem; padding: 2px 7px;">
+              Clear All
+            </button>
           </div>
           <div class="project-history-list" id="projectHistoryList">
             <div class="empty-state">No saved designs yet</div>
