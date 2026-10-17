@@ -114,6 +114,21 @@ function showCompileErrorModal(diagnosis, rawLog) {
   // Raw Traceback
   errorModalRawLog.textContent = lastErrorRawLog || "No traceback logs available.";
 
+  // Context-aware action button (Retry for network/sleep, Auto-Fix for compiler/code errors)
+  if (btnAutoFixCode) {
+    if (diagnosis && (diagnosis.category === "Backend Booting / Cold Sleep" || diagnosis.category === "Network / Server Error")) {
+      btnAutoFixCode.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+        Retry Generation`;
+      btnAutoFixCode.dataset.action = "retry";
+    } else {
+      btnAutoFixCode.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+        Ask AI to Auto-Fix Code`;
+      btnAutoFixCode.dataset.action = "autofix";
+    }
+  }
+
   // Show the header button in the compilation console
   if (btnOpenErrorModal) {
     btnOpenErrorModal.style.display = "inline-flex";
@@ -887,9 +902,13 @@ if (btnCopyErrorLog && btnCopyErrorLogText) {
 if (btnAutoFixCode) {
   btnAutoFixCode.addEventListener("click", () => {
     hideCompileErrorModal();
-    const diagTitle = (lastErrorDiagnosis && lastErrorDiagnosis.title) || "compiler error";
-    editInput.value = `Fix CAD compiler error: ${diagTitle}. Ensure valid build123d geometry and clean ASCII Python syntax with standard straight quotes.`;
-    handleApplyEdit();
+    if (btnAutoFixCode.dataset.action === "retry") {
+      handleGenerateCad();
+    } else {
+      const diagTitle = (lastErrorDiagnosis && lastErrorDiagnosis.title) || "compiler error";
+      editInput.value = `Fix CAD compiler error: ${diagTitle}. Ensure valid build123d geometry and clean ASCII Python syntax with standard straight quotes.`;
+      handleApplyEdit();
+    }
   });
 }
 
