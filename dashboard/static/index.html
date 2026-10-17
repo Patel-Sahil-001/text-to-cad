@@ -43,19 +43,35 @@
       <div class="header-actions">
         <button class="btn btn-secondary btn-sm" id="btnNewProject" title="Start fresh design">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          New Part
+          <span class="btn-text">New Part</span>
         </button>
         <button class="btn btn-accent btn-sm" id="btnDeployModal" title="Deployment Guide for Render & Vercel">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-          Deploy
+          <span class="btn-text">Deploy / Cloud</span>
         </button>
       </div>
     </header>
 
+    <!-- Mobile Navigation Tab Bar (Visible on mobile/tablet) -->
+    <nav class="mobile-tabs" id="mobileTabs">
+      <button class="mobile-tab-btn active" data-tab="editor">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        Studio
+      </button>
+      <button class="mobile-tab-btn" data-tab="viewport">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        3D Preview
+      </button>
+      <button class="mobile-tab-btn" data-tab="sidebar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        History
+      </button>
+    </nav>
+
     <!-- Main Studio Workspace -->
-    <main class="studio-body">
+    <main class="studio-body" id="studioBody">
       <!-- Left Sidebar: History & Quick Presets -->
-      <aside class="sidebar-panel">
+      <aside class="sidebar-panel" id="sidebarPanel">
         <div class="sidebar-section">
           <div class="section-title">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
@@ -92,7 +108,7 @@
       </aside>
 
       <!-- Center Studio Column: Prompting, Polishing, Editing -->
-      <section class="editor-panel">
+      <section class="editor-panel" id="editorPanel">
         <!-- Step 1: Prompt Input -->
         <div class="card prompt-card">
           <div class="card-header">
@@ -174,7 +190,7 @@
       </section>
 
       <!-- Right Column: Interactive 3D Viewport -->
-      <section class="viewport-panel">
+      <section class="viewport-panel" id="viewportPanel">
         <div class="viewport-card">
           <div class="viewport-toolbar">
             <div class="viewport-title">
@@ -230,14 +246,31 @@
           </div>
         </div>
       </section>
-  <!-- Deployment Guide Modal -->
+    </main>
+
+  <!-- Deployment & Storage Guide Modal -->
   <div class="modal-backdrop" id="deployModal" style="display: none;">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>Deploying to Render & Vercel</h3>
+        <h3>Cloud Deployment & Database Architecture</h3>
         <button class="modal-close-btn" id="btnCloseDeployModal">×</button>
       </div>
       <div class="modal-body">
+        <div class="deploy-tab-group" style="background: rgba(0, 242, 254, 0.05); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 8px; padding: 14px; margin-bottom: 18px;">
+          <h4 style="color: var(--accent-cyan); display: flex; align-items: center; gap: 8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            Do I Need a Database for Past Files & Parts?
+          </h4>
+          <p class="deploy-desc" style="color: var(--text-primary); margin-top: 6px;">
+            <strong>Short answer: No for local/Render disk, but an Object Store (S3/R2) is best for serverless cloud scale.</strong>
+          </p>
+          <ul class="deploy-steps" style="list-style-type: disc; margin-top: 8px;">
+            <li><strong>How it works currently:</strong> The dashboard automatically organizes every part in <code>dashboard/projects/&lt;project_id&gt;/</code> storing <code>meta.json</code>, <code>model.py</code>, <code>model.step</code>, and <code>model.stl</code>. Zero setup required!</li>
+            <li><strong>On Render:</strong> Attach a <strong>Render Persistent Disk</strong> at <code>/app/dashboard/projects</code> ($1/month for 1GB). Your files persist forever across redeploys without needing any SQL database.</li>
+            <li><strong>For High Scale / Multi-User:</strong> You store binary 3D files (<code>.stl</code>, <code>.step</code>) in <strong>Cloudflare R2 or AWS S3</strong> (free/cheap object storage) and save part metadata/prompts in <strong>SQLite / Supabase / PostgreSQL</strong>.</li>
+          </ul>
+        </div>
+
         <div class="deploy-tab-group">
           <h4>Option A: Deploy to Render (Recommended for full CAD Compiler)</h4>
           <p class="deploy-desc">Render runs the complete Python & OpenCASCADE CAD compiler container seamlessly using the provided <code>Dockerfile</code> and <code>render.yaml</code>.</p>

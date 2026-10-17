@@ -290,6 +290,7 @@ async function handleGenerateCad() {
       btnDownloadStl.disabled = false;
       btnDownloadStep.disabled = !data.step_url;
       btnDownloadCode.disabled = false;
+      if (window.innerWidth <= 1024) switchMobileTab("viewport");
     } else {
       viewportLoader.style.display = "none";
       alert("Build failed. Inspect compilation console below for error details.");
@@ -442,6 +443,7 @@ async function selectProject(id) {
       btnDownloadStl.disabled = false;
       btnDownloadStep.disabled = !data.step_url;
       btnDownloadCode.disabled = false;
+      if (window.innerWidth <= 1024) switchMobileTab("viewport");
     }
 
     loadProjectHistory();
@@ -567,6 +569,43 @@ if (btnCloseDeployModal && deployModal) {
   });
 }
 
+// Mobile Navigation Tab Switcher
+const mobileTabs = document.querySelectorAll(".mobile-tab-btn");
+const sidebarPanel = document.getElementById("sidebarPanel");
+const editorPanel = document.getElementById("editorPanel");
+const viewportPanel = document.getElementById("viewportPanel");
+
+function switchMobileTab(tabName) {
+  mobileTabs.forEach((btn) => {
+    btn.classList.toggle("active", btn.getAttribute("data-tab") === tabName);
+  });
+
+  if (sidebarPanel) sidebarPanel.classList.toggle("mobile-active", tabName === "sidebar");
+  if (editorPanel) editorPanel.classList.toggle("mobile-active", tabName === "editor");
+  if (viewportPanel) {
+    viewportPanel.classList.toggle("mobile-active", tabName === "viewport");
+    if (tabName === "viewport") {
+      // Trigger canvas resize
+      setTimeout(() => {
+        const container = document.getElementById("threeContainer");
+        if (container && renderer && camera) {
+          const w = container.clientWidth;
+          const h = container.clientHeight;
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        }
+      }, 50);
+    }
+  }
+}
+
+mobileTabs.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    switchMobileTab(btn.getAttribute("data-tab"));
+  });
+});
+
 // Check backend Groq config
 async function checkEngineConfig() {
   try {
@@ -586,4 +625,5 @@ window.addEventListener("DOMContentLoaded", () => {
   initThreeViewport();
   loadProjectHistory();
   checkEngineConfig();
+  switchMobileTab("editor"); // Default to editor view on mobile
 });
