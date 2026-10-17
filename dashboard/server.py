@@ -93,13 +93,50 @@ class DynamicPresetRequest(BaseModel):
     model: Optional[str] = None
 
 
+def is_valid_cad_code(code: str) -> bool:
+    """Validate whether code is actual Python CAD code rather than conversational filler."""
+    if not code or len(code.strip()) < 30:
+        return False
+    conversational_phrases = [
+        "i am happy", "i'm happy", "could you please", "looks like", "sorry",
+        "here is the", "hope this helps", "let me know if", "i need the code",
+        "provide the build123d"
+    ]
+    first_lines = "\n".join(code.splitlines()[:5]).lower()
+    if any(phrase in first_lines for phrase in conversational_phrases):
+        return False
+    # Must contain python def and cadgen/build123d markers
+    has_def = "def " in code
+    has_cad = any(marker in code for marker in ["bd.", "build123d", "cadgen", "Box(", "Cylinder("])
+    return has_def and has_cad
+
+
 def extract_python_code(text: str) -> str:
-    """Extract code from markdown code fences or return raw text."""
+    """Extract code from markdown code fences or return clean code text, rejecting conversational text."""
+    if not text:
+        return ""
     pattern = r"```(?:python)?\s*([\s\S]*?)```"
     matches = re.findall(pattern, text)
     if matches:
+        for m in matches:
+            if "def " in m and ("bd." in m or "build123d" in m or "cadgen" in m):
+                return m.strip()
         return matches[0].strip()
-    return text.strip()
+
+    # If no fences, filter out conversational chatter lines
+    lines = []
+    started = False
+    for line in text.splitlines():
+        trimmed = line.strip()
+        if trimmed.startswith(("import ", "from ", "def ", "#", "@", "LENGTH", "WIDTH", "HEIGHT", "RADIUS")):
+            started = True
+        if started:
+            lines.append(line)
+
+    candidate = "\n".join(lines).strip()
+    if is_valid_cad_code(candidate):
+        return candidate
+    return ""
 
 
 def parse_parameters_from_code(code: str) -> Dict[str, float]:
@@ -195,7 +232,7 @@ Return ONLY the raw Python code block (inside ```python ... ```), no other comme
             {"role": "user", "content": f"User Prompt: {prompt}\n\nTechnical Spec:\n{spec}\n\nSynthesize the build123d Python script now."}
         ],
         model=model,
-        max_tokens=1500,
+        max_tokens=2200,
         temperature=0.2
     )
     return extract_python_code(resp.choices[0].message.content)
@@ -206,7 +243,7 @@ def edit_code_with_groq(current_code: str, edit_instruction: str, client: Any, m
     sys_prompt = """You are an expert build123d CAD engineer.
 Modify the existing Python CAD script according to the user's revision instruction.
 Preserve the @stl and @step decorators, keep all top-level constants updated, and return valid build123d Python code.
-Output ONLY the Python code block."""
+Output ONLY the Python code block inside ```python ... ``` without conversational intro or commentary."""
 
     resp = client.chat.completions.create(
         messages=[
@@ -214,7 +251,7 @@ Output ONLY the Python code block."""
             {"role": "user", "content": f"Existing Code:\n```python\n{current_code}\n```\n\nRevision Instruction:\n{edit_instruction}"}
         ],
         model=model,
-        max_tokens=1500,
+        max_tokens=2200,
         temperature=0.2
     )
     return extract_python_code(resp.choices[0].message.content)
@@ -453,18 +490,22 @@ async def generate_cad(req: GenerateRequest):
     model = req.model or DEFAULT_MODEL
 
     code = req.code
-    # Synthesize dynamically if no code provided
-    if not code or len(code.strip()) < 10:
+    # Synthesize dynamically if no valid code provided
+    if not code or not is_valid_cad_code(code):
         if client:
             try:
-                code = generate_code_with_groq(req.prompt, req.polished_spec, client, model)
+                candidate = generate_code_with_groq(req.prompt, req.polished_spec, client, model)
+                if is_valid_cad_code(candidate):
+                    code = candidate
+                else:
+                    code = generate_dynamic_fallback(req.prompt)
             except Exception:
                 code = generate_dynamic_fallback(req.prompt)
         else:
             code = generate_dynamic_fallback(req.prompt)
 
     # Apply parameter overrides dynamically
-    if req.parameters:
+    if req.parameters and is_valid_cad_code(code):
         lines = code.splitlines()
         updated_lines = []
         for line in lines:
@@ -508,20 +549,40 @@ async def generate_cad(req: GenerateRequest):
         # Dynamic AI self-repair
         if attempt < max_attempts - 1 and client:
             try:
-                repair_prompt = f"The following build123d script failed with compiler output:\n{build_log[:400]}\n\nFix the code so it compiles cleanly without error. Output ONLY the working Python code:\n```python\n{code}\n```"
+                repair_prompt = f"The following build123d script failed with compiler output:\n{build_log[:400]}\n\nFix the code so it compiles cleanly without error. Output ONLY the working Python code inside ```python ``` without any conversational text:\n```python\n{code}\n```"
                 repaired = extract_python_code(
                     client.chat.completions.create(
                         messages=[{"role": "user", "content": repair_prompt}],
                         model=model,
-                        max_tokens=1500,
+                        max_tokens=2200,
                         temperature=0.1
                     ).choices[0].message.content
                 )
-                code = repaired
-                model_py.write_text(code, encoding="utf-8")
-                build_log += f"\n[AI Self-Repair Attempt {attempt + 1}] Re-compiling..."
+                if is_valid_cad_code(repaired):
+                    code = repaired
+                    model_py.write_text(code, encoding="utf-8")
+                    build_log += f"\n[AI Self-Repair Attempt {attempt + 1}] Re-compiling..."
             except Exception:
                 pass
+
+    # Guaranteed safety net: if compilation failed or syntax error occurred, generate clean proportional geometry
+    if not success or not (project_dir / "model.stl").exists():
+        fallback_code = generate_dynamic_fallback(req.prompt)
+        model_py.write_text(fallback_code, encoding="utf-8")
+        try:
+            proc = subprocess.run(
+                [PYTHON_EXE, "model.py"],
+                cwd=str(project_dir),
+                capture_output=True,
+                text=True,
+                timeout=40,
+            )
+            if proc.returncode == 0 and (project_dir / "model.stl").exists():
+                code = fallback_code
+                success = True
+                build_log += f"\n[Self-Healing CAD Engine] Dynamic parametric solid generated successfully."
+        except Exception:
+            pass
 
     elapsed = round(time.time() - start_time, 2)
 
