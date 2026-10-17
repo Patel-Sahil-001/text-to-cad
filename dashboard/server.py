@@ -65,6 +65,28 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def ensure_cors_headers(request: Request, call_next):
+    """Guarantees CORS headers on EVERY response (including errors, exceptions, and OPTIONS preflights)."""
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+    else:
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": str(exc), "error": "Internal Server Error"}
+            )
+
+    origin = request.headers.get("origin")
+    response.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
+
 def get_groq_client(override_key: Optional[str] = None):
     key = override_key or GROQ_API_KEY
     if not key or not GROQ_AVAILABLE:

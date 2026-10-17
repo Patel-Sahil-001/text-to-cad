@@ -396,12 +396,15 @@ async function handleGenerateCad() {
   } catch (err) {
     viewportLoader.style.display = "none";
     buildOutput.textContent = "Network/execution error: " + err.message;
+    const isFetchFailure = err.message.includes("Failed to fetch") || err.message.includes("NetworkError");
     showCompileErrorModal({
-      category: "Network / Server Error",
-      badge_color: "error",
-      title: "API Connection Failed",
-      why: `The browser could not communicate with the CAD server (${API_BASE}). This typically occurs if the backend container is spinning up from cold sleep (on free cloud tiers) or if network connectivity is interrupted.`,
-      solution: "1. Please wait 15-30 seconds for the backend to wake up.\n2. Click 'Process & Generate 3D Model' again to re-attempt."
+      category: isFetchFailure ? "Backend Booting / Cold Sleep" : "Network / Server Error",
+      badge_color: isFetchFailure ? "warning" : "error",
+      title: isFetchFailure ? "Render Backend Waking from Sleep" : "API Connection Failed",
+      why: isFetchFailure
+        ? `The browser could not connect to Render (${API_BASE}).\n\nRender Free Tier automatically puts containers into sleep mode after 15 minutes of inactivity or when deploying new code updates. When a request arrives while Render is waking up or building, Render returns a temporary 502/network drop, which Chrome blocks as a CORS / 'Failed to fetch' error.`
+        : `The browser could not communicate with the CAD server (${API_BASE}): ${err.message}`,
+      solution: "1. The Render container is waking up now (typically takes 15-30 seconds).\n2. Click 'Process & Generate 3D Model' again to build your 3D CAD model."
     }, err.stack || err.message);
   } finally {
     btnGenerateCad.disabled = false;
